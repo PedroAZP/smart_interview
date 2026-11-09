@@ -1,0 +1,57 @@
+Título da vaga: Desenvolvedor(a) Junior Fullstack (.NET / Angular)
+
+Modelo de trabalho: Híbrido (3x presencial, 2x remoto)
+
+Tipo de contrato: CLT
+
+Nível: Júnior
+
+Sobre a oportunidade:
+
+Estamos expandindo nossa equipe de desenvolvimento e buscando um(a) Desenvolvedor(a) Fullstack Júnior motivado(a) a trabalhar com arquitetura corporativa e sistemas de grande escala. Você atuará no desenvolvimento de novas soluções voltadas para gestão empresarial e integração de APIs.
+
+O que você vai fazer:
+
+Implementar serviços RESTful utilizando C# (.NET Core).
+
+Construir telas interativas e modulares com Angular e TypeScript.
+
+Criar e integrar procedure e consultas eficientes em banco de dados SQL Server.
+
+Documentar APIs utilizando OpenAPI/Swagger.
+
+Atuar no suporte de segundo nível para diagnóstico e resolução de incidentes em ambiente de produção.
+
+Requisitos e qualificações:
+
+Ensino Superior completo ou em andamento em Ciência da Computação, Engenharia de Software ou correlatos.
+
+Conhecimento prático em linguagem C# e ecossistema .NET Core.
+
+Experiência com o framework Angular (TypeScript).
+
+Conhecimento em banco de dados SQL Server.
+
+Noções de arquitetura MVC e Clean Architecture.
+
+Perfil analítico, proativo e com foco na entrega de código seguro e de qualidade.
+
+Diferenciais:
+
+Conhecimento de Azure DevOps para controle de pipelines.
+
+Noções de metodologias de teste de software (TDD/Integration Tests).
+
+O que oferecemos:
+
+Pacote salarial atraente.
+
+Vale Refeição e Vale Transporte.
+
+Plano de saúde Bradesco (com extensão para dependentes).
+
+Gympass.
+
+Programa de incentivo à educação acadêmica e de pós-graduação.
+
+📩 Candidaturas: Faça o upload do seu currículo no nosso portal de vagas ou envie para talent@enterprise-solutions.com.br.

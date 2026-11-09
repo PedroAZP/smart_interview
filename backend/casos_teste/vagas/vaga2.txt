@@ -1,0 +1,53 @@
+Título da vaga: Desenvolvedor(a) Fullstack Júnior (Python / Vue.js)
+
+Modelo de trabalho: Híbrido (2x na semana no escritório / São Paulo - SP)
+
+Tipo de contrato: PJ ou CLT
+
+Nível: Júnior
+
+Sobre a oportunidade:
+
+Procuramos talentos em início de carreira para compor o time de Engenharia de Software da nossa FinTech! Se você ama resolver problemas complexos com soluções elegantes em Python e construir interfaces fluidas em Vue.js, essa vaga é para você. Aqui você terá mentoria contínua de desenvolvedores seniores e espaço para testar novas ideias.
+
+O que você vai fazer:
+
+Auxiliar no desenvolvimento da camada backend utilizando Python (Django / FastAPI).
+
+Desenvolver componentes reativos e interfaces em Vue.js.
+
+Escrever e otimizar consultas em banco de dados SQL.
+
+Corrigir bugs, implementar melhorias e otimizar a performance de microsserviços.
+
+Trabalhar alinhado às práticas de CI/CD para automação de entregas de software.
+
+Requisitos e qualificações:
+
+Bons fundamentos de lógica de programação, estruturas de dados e orientação a objetos.
+
+Experiência prática com Python (frameworks Django ou FastAPI) no backend.
+
+Domínio de frontend moderno utilizando Vue.js (ou familiaridade sólida em React/Angular com disposição para migrar para Vue).
+
+Bons conhecimentos em modelagem e consultas SQL (PostgreSQL).
+
+Uso frequente de Git para branching, pull requests e resolução de conflitos.
+
+Diferenciais:
+
+Conhecimento ou vivência no ecossistema de serviços em nuvem (AWS ou GCP).
+
+Projetos hospedados no GitHub demonstrando clean code e organização.
+
+O que oferecemos:
+
+Remuneração competitiva + Bônus por metas atingidas.
+
+Ambiente de trabalho moderno, inovador e descontraído.
+
+Horário flexível.
+
+Subsídio para certificações técnicas e eventos da comunidade de software.
+
+📩 Quer fazer parte do time? Inscreva-se enviando seu LinkedIn e GitHub para recrutamento@fintechapp.io.

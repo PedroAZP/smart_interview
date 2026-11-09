@@ -1,0 +1,59 @@
+Título da vaga: Desenvolvedor(a) Fullstack Júnior (Node.js / React)
+
+Modelo de trabalho: 100% Remoto
+
+Tipo de contrato: CLT
+
+Nível: Júnior
+
+Sobre a oportunidade:
+
+Buscamos uma pessoa desenvolvedora júnior com energia, sede de aprendizado e vontade de construir produtos com alto impacto no setor de tecnologia e educação. Você atuará diretamente na evolução da nossa plataforma web, integrando uma equipe engajada, colaborativa e focada na melhor experiência de uso para milhares de alunos.
+
+O que você vai fazer:
+
+Desenvolver e manter APIs RESTful escaláveis em Node.js.
+
+Criar interfaces modernas, acessíveis e responsivas em React.
+
+Participar das cerimonias da metodologia ágil (Scrum/Kanban) e contribuir com discussões de arquitetura de código.
+
+Escrever código limpo, realizar testes unitários e participar de revisões de código (Code Review).
+
+Colaborar com os times de Produto e Design na criação de novas funcionalidades.
+
+Requisitos e qualificações:
+
+Formação em Ciência da Computação, Análise e Desenvolvimento de Sistemas ou áreas correlatas (concluído ou em andamento).
+
+Conhecimento sólido em JavaScript/TypeScript, HTML5 e CSS3.
+
+Experiência prévia (projetos pessoais, acadêmicos ou estágio) em Node.js e React.
+
+Noções básicas de bancos de dados relacionais (PostgreSQL/MySQL) e não-relacionais (MongoDB).
+
+Familiaridade com controle de versão utilizando Git e GitHub/GitLab.
+
+Mentalidade de aprendizado contínuo (growth mindset) e boa comunicação interpessoal.
+
+Diferenciais:
+
+Experiência com Tailwind CSS ou Styled Components.
+
+Noções de containerização com Docker.
+
+Conhecimento prévio em práticas de testes (Jest / React Testing Library).
+
+O que oferecemos:
+
+Salário compatível com o mercado.
+
+Vale Refeição / Alimentação nos cartões Flash.
+
+Plano de Saúde e Odontológico 100% custeados.
+
+Auxílio Home Office.
+
+Acesso a cursos e plataformas de aprendizado de tecnologia.
+
+📩 Interessado(a)? Envie seu currículo e o link do seu perfil do GitHub para carreiras@techcompany.com.br com o assunto "Vaga Fullstack Jr - Seu Nome" ou candidate-se diretamente pelo botão abaixo.
