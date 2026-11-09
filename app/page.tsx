@@ -2,28 +2,26 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { ArrowUp, FileText, Plus, SquareTerminal, X } from "lucide-react";
+import { ArrowUp, FileText, Loader2, Plus, SquareTerminal, X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { createInterview } from "@/lib/api";
+import { useGuestId } from "@/hooks/use-guest-id";
 
 const USER_NAME = "Pedro";
 
-const SUGGESTIONS = [
-  "Simular uma entrevista de system design",
-  "Treinar perguntas sobre liderança de times",
-  "Praticar trade-offs de arquitetura",
-  "Revisar meu currículo para vagas Staff+",
-];
-
 export default function HomePage() {
   const router = useRouter();
+  const guestId = useGuestId();
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const [value, setValue] = React.useState("");
   const [files, setFiles] = React.useState<File[]>([]);
+  const [isLoading, setIsLoading] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
 
-  const canSend = value.trim().length > 0 || files.length > 0;
+  const canSend = (value.trim().length > 0 || files.length > 0) && !isLoading;
 
   // Auto-resize do textarea
   React.useEffect(() => {
@@ -33,13 +31,40 @@ export default function HomePage() {
     el.style.height = `${Math.min(el.scrollHeight, 240)}px`;
   }, [value]);
 
-  function handleSubmit() {
+  // Limpa o formulário e destrava loading sempre que a página montar ou for revisitada
+  React.useEffect(() => {
+    setIsLoading(false);
+    setValue("");
+    setFiles([]);
+    setError(null);
+  }, []);
+
+  async function handleSubmit() {
     if (!canSend) return;
     const prompt = value.trim();
-    // Os arquivos não vão na URL: guarde-os em estado global/upload antes de navegar.
-    router.push(
-      prompt ? `/novo?prompt=${encodeURIComponent(prompt)}` : "/novo",
-    );
+    if (!prompt) return;
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const { id } = await createInterview(prompt, { guestId: guestId ?? undefined });
+      
+      // Notifica a sidebar para carregar o histórico com a nova conversa imediatamente
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("interviews-changed"));
+      }
+
+      // Limpa os campos antes de navegar
+      setValue("");
+      setFiles([]);
+      setIsLoading(false);
+
+      router.push(`/chat/${id}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao iniciar a entrevista.");
+      setIsLoading(false);
+    }
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -112,7 +137,8 @@ export default function HomePage() {
             rows={2}
             placeholder="Descreva a vaga ou diga qual posição quer treinar"
             aria-label="Mensagem para o Tech Lead"
-            className="block max-h-60 w-full resize-none bg-transparent px-5 pt-5 pb-2 text-base leading-relaxed outline-none placeholder:text-muted-foreground"
+            disabled={isLoading}
+            className="block max-h-60 w-full resize-none bg-transparent px-5 pt-5 pb-2 text-base leading-relaxed outline-none placeholder:text-muted-foreground disabled:opacity-60"
           />
 
           <div className="flex items-center justify-between gap-2 px-3 pb-3">
@@ -129,7 +155,8 @@ export default function HomePage() {
                 type="button"
                 aria-label="Anexar currículo ou vaga"
                 onClick={() => fileInputRef.current?.click()}
-                className="flex size-9 items-center justify-center rounded-full text-muted-foreground outline-none transition hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-cyan-400/60"
+                disabled={isLoading}
+                className="flex size-9 items-center justify-center rounded-full text-muted-foreground outline-none transition hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-cyan-400/60 disabled:opacity-40"
               >
                 <Plus className="size-5" />
               </button>
@@ -144,30 +171,24 @@ export default function HomePage() {
                 "flex size-9 items-center justify-center rounded-full outline-none transition focus-visible:ring-2 focus-visible:ring-cyan-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                 canSend
                   ? "bg-cyan-400 text-slate-900 hover:bg-cyan-300 cursor-pointer"
-                  : "cursor-not-allowed bg-muted text-muted-foreground",
+                  : "cursor-not-allowed bg-muted text-muted-foreground"
               )}
             >
-              <ArrowUp className="size-5" />
+              {isLoading ? (
+                <Loader2 className="size-5 animate-spin" />
+              ) : (
+                <ArrowUp className="size-5" />
+              )}
             </button>
           </div>
         </div>
 
-        {/* Sugestões */}
-        {/* <div className="mt-6 flex flex-wrap justify-center gap-2">
-          {SUGGESTIONS.map((s) => (
-            <button
-              key={s}
-              type="button"
-              onClick={() => {
-                setValue(s);
-                textareaRef.current?.focus();
-              }}
-              className="rounded-full border border-border/60 bg-card/40 px-4 py-2 text-xs text-muted-foreground outline-none transition hover:border-cyan-400/40 hover:text-foreground focus-visible:ring-2 focus-visible:ring-cyan-400/60"
-            >
-              {s}
-            </button>
-          ))}
-        </div> */}
+        {/* Erro */}
+        {error && (
+          <p className="mt-3 text-sm text-red-400" role="alert">
+            {error}
+          </p>
+        )}
       </div>
     </div>
   );

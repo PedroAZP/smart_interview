@@ -1,60 +1,100 @@
 "use client";
 
 import * as React from "react";
-import { ArrowUp, SquareTerminal } from "lucide-react";
+import { useParams } from "next/navigation";
+import { ArrowUp } from "lucide-react";
+
+// ---------------------------------------------------------------------------
+// O componente real que usa useParams() fica dentro de <Suspense> no export
+// default. Isso permite o prerender em rotas dinâmicas (ex: /chat/[id]).
+// ---------------------------------------------------------------------------
 
 import { cn } from "@/lib/utils";
+import { getMessages, replyInterview, sendMessage, type MessageOut } from "@/lib/api";
 
-// Mesmo formato da tabela Message do backend
 type Message = {
   id: string;
   role: "user" | "model";
   content: string;
 };
 
-// TODO (com backend): ler o id com useParams() e buscar as mensagens da API.
-const INITIAL_MESSAGES: Message[] = [
-  {
-    id: "1",
-    role: "model",
-    content:
-      "Olá! Vou conduzir a sua entrevista para a vaga de Tech Lead. Para começar: conte um pouco sobre a sua trajetória e o tipo de time que você já liderou.",
-  },
-  {
-    id: "2",
-    role: "user",
-    content:
-      "Trabalho há 8 anos com desenvolvimento, os últimos 3 como líder técnico de um time de 6 pessoas, focado em APIs e integrações.",
-  },
-  {
-    id: "3",
-    role: "model",
-    content:
-      "Boa. Vamos aprofundar em arquitetura. Imagine que o seu time precisa quebrar um monolito em serviços menores, com prazo apertado.\n\nComo você decidiria:\n1. Por onde começar a separação?\n2. Como garantir que o time continue entregando funcionalidades durante a migração?\n3. Quais riscos você levaria para a diretoria antes de começar?",
-  },
-];
+function toUiMessage(m: MessageOut): Message {
+  return { id: String(m.id), role: m.role, content: m.content };
+}
 
-// Respostas falsas, usadas em rodízio. Troque por uma chamada ao FastAPI depois.
-const FAKE_REPLIES = [
-  "Entendi o seu raciocínio. Um ponto que eu gostaria de explorar melhor: como você mediria se a decisão deu certo depois de algumas semanas? Cite pelo menos duas métricas e explique por que elas importam para o negócio.",
-  "Interessante. E se o time discordasse da sua abordagem? Me conte como você conduziria essa conversa sem perder o prazo e sem desmotivar ninguém.",
-  "Ótimo. Vamos para o próximo tema: revisão de código. Qual é o seu critério para aprovar ou barrar um pull request, e como você ensina isso para devs menos experientes?",
-];
-
+// ---------------------------------------------------------------------------
+// Wrapper exportado — envolve o conteúdo em <Suspense> para que o prerender
+// não bloqueie por causa de useParams() em rota dinâmica não estática.
+// ---------------------------------------------------------------------------
 export default function ChatPage() {
-  const [messages, setMessages] = React.useState<Message[]>(INITIAL_MESSAGES);
+  return (
+    <React.Suspense fallback={<ChatSkeleton />}>
+      <ChatContent />
+    </React.Suspense>
+  );
+}
+
+function ChatSkeleton() {
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center">
+      <span className="text-sm text-muted-foreground animate-pulse">
+        Carregando entrevista...
+      </span>
+    </div>
+  );
+}
+
+function ChatContent() {
+  const { id: interviewId } = useParams<{ id: string }>();
+
+  const [messages, setMessages] = React.useState<Message[]>([]);
   const [isStreaming, setIsStreaming] = React.useState(false);
+  const [isLoadingHistory, setIsLoadingHistory] = React.useState(true);
   const [input, setInput] = React.useState("");
+  const [error, setError] = React.useState<string | null>(null);
 
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
   const bottomRef = React.useRef<HTMLDivElement>(null);
   const nearBottom = React.useRef(true);
-  const timerRef = React.useRef<ReturnType<typeof setInterval> | null>(null);
-  const replyIndex = React.useRef(0);
 
-  const canSend = input.trim().length > 0 && !isStreaming;
+  const canSend = input.trim().length > 0 && !isStreaming && !isLoadingHistory;
 
-  // 1. Auto-resize do textarea
+  // 1. Carrega o histórico do backend ao montar
+  React.useEffect(() => {
+    if (!interviewId) return;
+
+    let isCancelled = false;
+    const abortController = new AbortController();
+
+    setIsLoadingHistory(true);
+    setError(null);
+
+    getMessages(interviewId)
+      .then((msgs) => {
+        if (isCancelled) return;
+        setMessages(msgs.map(toUiMessage));
+        setIsLoadingHistory(false);
+
+        // Se a última mensagem for do usuário, significa que a IA ainda precisa responder
+        const lastMsg = msgs[msgs.length - 1];
+        if (lastMsg && lastMsg.role === "user") {
+          startInitialReply(abortController.signal);
+        }
+      })
+      .catch(() => {
+        if (isCancelled) return;
+        setError("Não foi possível carregar a conversa.");
+        setIsLoadingHistory(false);
+      });
+
+    return () => {
+      isCancelled = true;
+      abortController.abort();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [interviewId]);
+
+  // 2. Auto-resize do textarea
   React.useEffect(() => {
     const el = textareaRef.current;
     if (!el) return;
@@ -62,7 +102,7 @@ export default function ChatPage() {
     el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
   }, [input]);
 
-  // 2. Guarda se o usuário está perto do fim da página
+  // 3. Rastreia se o usuário está perto do fim
   React.useEffect(() => {
     function onScroll() {
       const distance =
@@ -75,8 +115,7 @@ export default function ChatPage() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // 3. Desce a tela: sempre quando o usuário envia, e durante a resposta
-  //    só se ele não tiver subido para ler algo
+  // 4. Scroll automático
   React.useEffect(() => {
     const last = messages[messages.length - 1];
     if (last?.role === "user" || nearBottom.current) {
@@ -84,17 +123,56 @@ export default function ChatPage() {
     }
   }, [messages]);
 
-  // 4. Limpa o timer se a página for fechada no meio da resposta
-  React.useEffect(() => {
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, []);
+  // ---------------------------------------------------------------------------
+  // Resposta inicial: gera resposta para a mensagem já criada em POST /interviews
+  // ---------------------------------------------------------------------------
+  async function startInitialReply(signal?: AbortSignal) {
+    if (!interviewId) return;
+    setIsStreaming(true);
+    setError(null);
 
-  // Esta é a ÚNICA parte que você troca quando ligar o backend.
-  function handleSend(text: string) {
     const replyId = crypto.randomUUID();
+    setMessages((prev) => [
+      ...prev,
+      { id: replyId, role: "model", content: "" },
+    ]);
 
+    try {
+      await replyInterview(
+        interviewId,
+        (chunk) => {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === replyId ? { ...m, content: m.content + chunk } : m
+            )
+          );
+        },
+        () => {
+          setIsStreaming(false);
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent("interviews-changed"));
+          }
+        },
+        signal
+      );
+    } catch (err) {
+      if (signal?.aborted) return;
+      setError(err instanceof Error ? err.message : "Erro ao obter resposta.");
+      setMessages((prev) => prev.filter((m) => m.id !== replyId));
+      setIsStreaming(false);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Envia nova mensagem do usuário e recebe chunks do modelo
+  // ---------------------------------------------------------------------------
+  async function submit() {
+    if (!canSend) return;
+    const text = input.trim();
+    setInput("");
+
+    const replyId = crypto.randomUUID();
+    // Adiciona a mensagem do usuário e o placeholder com os três pontinhos imediatamente
     setMessages((prev) => [
       ...prev,
       { id: crypto.randomUUID(), role: "user", content: text },
@@ -102,33 +180,29 @@ export default function ChatPage() {
     ]);
     setIsStreaming(true);
 
-    const words =
-      FAKE_REPLIES[replyIndex.current++ % FAKE_REPLIES.length].split(" ");
-    let tick = 0;
-    let shown = 0;
-
-    timerRef.current = setInterval(() => {
-      tick++;
-      if (tick < 15) return; // ~600ms mostrando os três pontinhos
-
-      shown++;
-      const content = words.slice(0, shown).join(" ");
-      setMessages((prev) =>
-        prev.map((m) => (m.id === replyId ? { ...m, content } : m)),
+    try {
+      await sendMessage(
+        interviewId,
+        text,
+        (chunk) => {
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === replyId ? { ...m, content: m.content + chunk } : m
+            )
+          );
+        },
+        () => {
+          setIsStreaming(false);
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent("interviews-changed"));
+          }
+        }
       );
-
-      if (shown >= words.length) {
-        if (timerRef.current) clearInterval(timerRef.current);
-        timerRef.current = null;
-        setIsStreaming(false);
-      }
-    }, 40);
-  }
-
-  function submit() {
-    if (!canSend) return;
-    handleSend(input.trim());
-    setInput("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao obter resposta.");
+      setMessages((prev) => prev.filter((m) => m.id !== replyId));
+      setIsStreaming(false);
+    }
   }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
@@ -142,6 +216,14 @@ export default function ChatPage() {
     <div className="flex flex-1 flex-col">
       {/* Lista de mensagens */}
       <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 py-6">
+        {isLoadingHistory && (
+          <div className="flex justify-center py-8">
+            <span className="text-sm text-muted-foreground animate-pulse">
+              Carregando conversa...
+            </span>
+          </div>
+        )}
+
         {messages.map((m, i) => {
           const isUser = m.role === "user";
           const isTyping =
@@ -152,35 +234,25 @@ export default function ChatPage() {
               key={m.id}
               className={cn(
                 "flex w-full gap-3",
-                isUser ? "justify-end" : "justify-start",
+                isUser ? "justify-end" : "justify-start"
               )}
             >
-              {!isUser && (
-                <div className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg border border-slate-700 bg-slate-800 text-sky-100">
-                  <SquareTerminal className="size-4" />
-                </div>
-              )}
-
               <div
                 className={cn(
                   "max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed break-words whitespace-pre-wrap sm:max-w-[75%]",
                   isUser
                     ? "rounded-br-md bg-muted text-foreground"
-                    : "rounded-tl-md border border-border/60 bg-card/60",
+                    : "rounded-tl-md border border-border/60 bg-card/60"
                 )}
               >
                 {isTyping ? (
                   <span
-                    className="flex items-center gap-1 py-1.5"
-                    aria-label="O Tech Lead está digitando"
+                    className="flex items-center gap-1.5 py-1"
+                    aria-label="O Tech Lead está pensando"
                   >
-                    {[0, 1, 2].map((dot) => (
-                      <span
-                        key={dot}
-                        className="size-1.5 animate-bounce rounded-full bg-muted-foreground motion-reduce:animate-none"
-                        style={{ animationDelay: `${dot * 150}ms` }}
-                      />
-                    ))}
+                    <span className="size-2 rounded-full bg-cyan-400 animate-bounce motion-reduce:animate-none [animation-delay:-0.3s]" />
+                    <span className="size-2 rounded-full bg-cyan-400 animate-bounce motion-reduce:animate-none [animation-delay:-0.15s]" />
+                    <span className="size-2 rounded-full bg-cyan-400 animate-bounce motion-reduce:animate-none" />
                   </span>
                 ) : (
                   m.content
@@ -189,6 +261,12 @@ export default function ChatPage() {
             </div>
           );
         })}
+
+        {error && (
+          <p className="text-center text-sm text-red-400" role="alert">
+            {error}
+          </p>
+        )}
 
         {/* scroll-mb deixa folga para o campo fixo não cobrir a última mensagem */}
         <div ref={bottomRef} className="scroll-mb-40" />
@@ -206,7 +284,8 @@ export default function ChatPage() {
               rows={1}
               placeholder="Responda ao Tech Lead"
               aria-label="Sua mensagem"
-              className="block max-h-[200px] min-h-9 w-full resize-none bg-transparent py-2 text-base leading-relaxed outline-none placeholder:text-muted-foreground"
+              disabled={isStreaming || isLoadingHistory}
+              className="block max-h-[200px] min-h-9 w-full resize-none bg-transparent py-2 text-base leading-relaxed outline-none placeholder:text-muted-foreground disabled:opacity-60"
             />
             <button
               type="button"
@@ -217,7 +296,7 @@ export default function ChatPage() {
                 "flex size-9 shrink-0 items-center justify-center rounded-full outline-none transition focus-visible:ring-2 focus-visible:ring-cyan-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                 canSend
                   ? "bg-cyan-400 text-slate-900 hover:bg-cyan-300"
-                  : "cursor-not-allowed bg-muted text-muted-foreground",
+                  : "cursor-not-allowed bg-muted text-muted-foreground"
               )}
             >
               <ArrowUp className="size-5" />

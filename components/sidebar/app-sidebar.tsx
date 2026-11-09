@@ -22,18 +22,18 @@ import {
 } from "@/components/ui/sidebar";
 import { NavHistory, NavProjects } from "./nav-items";
 import { NavUser } from "./nav-user";
+import { listInterviews, type InterviewSummary } from "@/lib/api";
+import { useGuestId } from "@/hooks/use-guest-id";
 
-const data = {
-  user: {
-    name: "shadcn",
-    email: "m@example.com",
-    avatar: "/avatars/shadcn.jpg",
-  },
-  projects: [
-    { name: "Nova conversa", url: "/novo", icon: MessagesCircle },
-    { name: "Diagnóstico", url: "/analise", icon: Newspaper },
-  ],
-  history: [] as { id: string; title: string; url: string }[],
+const STATIC_PROJECTS = [
+  { name: "Nova conversa", url: "/", icon: MessagesCircle },
+  { name: "Diagnóstico", url: "/analise", icon: Newspaper },
+];
+
+const STATIC_USER = {
+  name: "Pedro",
+  email: "pedro@exemplo.com",
+  avatar: "/avatars/shadcn.jpg",
 };
 
 function SidebarLogo() {
@@ -53,6 +53,38 @@ function SidebarLogo() {
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const guestId = useGuestId();
+  const [history, setHistory] = React.useState<InterviewSummary[]>([]);
+
+  const fetchHistory = React.useCallback(() => {
+    if (!guestId) return;
+    listInterviews(guestId)
+      .then(setHistory)
+      .catch(() => {
+        // Silencia o erro — o backend pode estar offline durante dev
+      });
+  }, [guestId]);
+
+  // Busca o histórico quando o guestId estiver disponível e ouve atualizações
+  React.useEffect(() => {
+    fetchHistory();
+
+    const handleUpdate = () => {
+      fetchHistory();
+    };
+
+    window.addEventListener("interviews-changed", handleUpdate);
+    return () => {
+      window.removeEventListener("interviews-changed", handleUpdate);
+    };
+  }, [fetchHistory]);
+
+  const historyItems = history.map((item) => ({
+    id: item.id,
+    title: item.title,
+    url: `/chat/${item.id}`,
+  }));
+
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
@@ -83,12 +115,12 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
 
       <SidebarContent>
-        <NavProjects projects={data.projects} />
-        <NavHistory items={data.history} />
+        <NavProjects projects={STATIC_PROJECTS} />
+        <NavHistory items={historyItems} />
       </SidebarContent>
 
       <SidebarFooter>
-        <NavUser user={data.user} />
+        <NavUser user={STATIC_USER} />
       </SidebarFooter>
 
       <SidebarRail />
