@@ -4,6 +4,18 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 export type MessageRole = "user" | "model";
 
+export interface User {
+  id: number;
+  name: string;
+  email: string;
+  avatar?: string;
+}
+
+export interface AuthResponse {
+  user: User;
+  token: string;
+}
+
 export interface MessageOut {
   id: number;
   role: MessageRole;
@@ -22,12 +34,99 @@ export interface CreateInterviewResponse {
   title: string;
 }
 
+export interface ReportItemOut {
+  id: number;
+  kind: "strength" | "blind_spot" | "improvement";
+  topic?: string | null;
+  description: string;
+  sort_order: number;
+}
+
+export interface ReportOut {
+  id: number;
+  interview_id: string;
+  score: number;
+  score_technical: number;
+  score_communication: number;
+  score_alignment: number;
+  summary: string;
+  created_at: string;
+  items: ReportItemOut[];
+}
+
+// ---------------------------------------------------------------------------
+// Autenticação (Login, Cadastro e Google)
+// ---------------------------------------------------------------------------
+export async function loginWithEmail(email: string, password: string): Promise<AuthResponse> {
+  const res = await fetch(`${API_BASE}/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.detail ?? "Erro ao realizar login.");
+  }
+  return res.json();
+}
+
+export async function registerWithEmail(
+  name: string,
+  email: string,
+  password: string
+): Promise<AuthResponse> {
+  const res = await fetch(`${API_BASE}/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, email, password }),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.detail ?? "Erro ao realizar cadastro.");
+  }
+  return res.json();
+}
+
+export async function loginWithGoogle(data: {
+  credential?: string;
+  email?: string;
+  name?: string;
+}): Promise<AuthResponse> {
+  const res = await fetch(`${API_BASE}/auth/google`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.detail ?? "Erro ao autenticar com o Google.");
+  }
+  return res.json();
+}
+
+export async function getCurrentUser(token: string): Promise<User> {
+  const res = await fetch(`${API_BASE}/auth/me`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  if (!res.ok) {
+    throw new Error("Sessão expirada ou inválida.");
+  }
+  return res.json();
+}
+
 // ---------------------------------------------------------------------------
 // Cria uma nova entrevista e retorna { id, title }
 // ---------------------------------------------------------------------------
 export async function createInterview(
   message: string,
-  options?: { jobDescription?: string; resumeText?: string; guestId?: string }
+  options?: {
+    jobDescription?: string;
+    resumeText?: string;
+    guestId?: string;
+    userId?: number;
+  }
 ): Promise<CreateInterviewResponse> {
   const res = await fetch(`${API_BASE}/interviews`, {
     method: "POST",
@@ -37,6 +136,7 @@ export async function createInterview(
       job_description: options?.jobDescription ?? null,
       resume_text: options?.resumeText ?? null,
       guest_id: options?.guestId ?? null,
+      user_id: options?.userId ?? null,
     }),
   });
   if (!res.ok) {
@@ -59,11 +159,19 @@ export async function getMessages(interviewId: string): Promise<MessageOut[]> {
 // Lista entrevistas (histórico da sidebar)
 // ---------------------------------------------------------------------------
 export async function listInterviews(
-  guestId?: string
+  guestId?: string,
+  userId?: number
 ): Promise<InterviewSummary[]> {
-  const url = guestId
-    ? `${API_BASE}/interviews?guest_id=${encodeURIComponent(guestId)}`
-    : `${API_BASE}/interviews`;
+  let url = `${API_BASE}/interviews`;
+  const params = new URLSearchParams();
+  if (userId) {
+    params.set("user_id", String(userId));
+  } else if (guestId) {
+    params.set("guest_id", guestId);
+  }
+  const queryString = params.toString();
+  if (queryString) url += `?${queryString}`;
+
   const res = await fetch(url);
   if (!res.ok) throw new Error("Erro ao buscar histórico.");
   return res.json();
@@ -165,4 +273,55 @@ export async function sendMessage(
 
   await consumeSSE(res, onChunk, onDone);
 }
+
+// ---------------------------------------------------------------------------
+// Relatórios de Análise (Apenas usuários autenticados)
+// ---------------------------------------------------------------------------
+export async function generateReport(
+  interviewId: string,
+  token: string
+): Promise<ReportOut> {
+  const res = await fetch(`${API_BASE}/interviews/${interviewId}/report`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.detail ?? "Erro ao gerar relatório da entrevista.");
+  }
+  return res.json();
+}
+
+export async function getReport(
+  interviewId: string,
+  token: string
+): Promise<ReportOut> {
+  const res = await fetch(`${API_BASE}/interviews/${interviewId}/report`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.detail ?? "Erro ao obter relatório.");
+  }
+  return res.json();
+}
+
+export async function listUserReports(token: string): Promise<ReportOut[]> {
+  const res = await fetch(`${API_BASE}/interviews/reports/all`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}));
+    throw new Error(err?.detail ?? "Erro ao carregar diagnósticos.");
+  }
+  return res.json();
+}
+
 

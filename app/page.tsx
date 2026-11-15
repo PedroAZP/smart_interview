@@ -7,14 +7,16 @@ import { ArrowUp, FileText, Loader2, Plus, SquareTerminal, X } from "lucide-reac
 import { cn } from "@/lib/utils";
 import { createInterview } from "@/lib/api";
 import { useGuestId } from "@/hooks/use-guest-id";
-
-const USER_NAME = "Pedro";
+import { useAuth } from "@/hooks/use-auth";
 
 export default function HomePage() {
   const router = useRouter();
   const guestId = useGuestId();
+  const { user } = useAuth();
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const displayName = user ? user.name.split(" ")[0] : "Pedro";
 
   const [value, setValue] = React.useState("");
   const [files, setFiles] = React.useState<File[]>([]);
@@ -48,7 +50,10 @@ export default function HomePage() {
     setError(null);
 
     try {
-      const { id } = await createInterview(prompt, { guestId: guestId ?? undefined });
+      const { id } = await createInterview(prompt, {
+        guestId: guestId ?? undefined,
+        userId: user?.id,
+      });
       
       // Notifica a sidebar para carregar o histórico com a nova conversa imediatamente
       if (typeof window !== "undefined") {
@@ -95,7 +100,9 @@ export default function HomePage() {
             <SquareTerminal className="size-5" />
           </div>
           <h1 className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
-            Pronto para a entrevista, {USER_NAME}?
+            {user
+              ? `Pronto para a entrevista, ${user.name.split(" ")[0]}?`
+              : "Pronto para a sua próxima entrevista?"}
           </h1>
         </div>
         <p className="mt-3 max-w-md text-balance text-center text-sm text-muted-foreground">

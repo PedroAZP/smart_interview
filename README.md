@@ -1,17 +1,16 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
-## Getting Started
+## Vamos começar
 
-First, run the development server:
+Primeira vez rodando o projeto:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+#Executar o projeto o backend
+1.cd backend
+2..venv\Scripts\uvicorn app.main:app
+3.--reload
+#Executar o projeto o frontend
+1.npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.

@@ -9,8 +9,13 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.db import get_db
-from app.models import Interview, Message
-from app.services.llm import gerar_resposta_stream, gerar_titulo
+from app.models import Interview, Message, Report, ReportItem, User
+from app.routers.auth import get_current_user
+from app.services.llm import (
+    gerar_relatorio_analise,
+    gerar_resposta_stream,
+    gerar_titulo,
+)
 
 router = APIRouter(prefix="/interviews", tags=["interviews"])
 
@@ -23,6 +28,7 @@ class CreateInterviewRequest(BaseModel):
     job_description: Optional[str] = None
     resume_text: Optional[str] = None
     guest_id: Optional[str] = None  # ID anônimo gerado no front
+    user_id: Optional[int] = None   # ID do usuário logado
 
 
 class CreateInterviewResponse(BaseModel):
@@ -51,6 +57,30 @@ class MessageOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class ReportItemOut(BaseModel):
+    id: int
+    kind: str
+    topic: Optional[str] = None
+    description: str
+    sort_order: int
+
+    model_config = {"from_attributes": True}
+
+
+class ReportOut(BaseModel):
+    id: int
+    interview_id: str
+    score: int
+    score_technical: int
+    score_communication: int
+    score_alignment: int
+    summary: str
+    created_at: str
+    items: list[ReportItemOut] = []
+
+    model_config = {"from_attributes": True}
+
+
 # ---------------------------------------------------------------------------
 # POST /interviews  → cria entrevista e retorna o ID
 # ---------------------------------------------------------------------------
@@ -67,7 +97,8 @@ def create_interview(
 
     # Cria a entrevista no banco
     interview = Interview(
-        guest_id=body.guest_id or "anon",
+        user_id=body.user_id,
+        guest_id=body.guest_id or ("anon" if not body.user_id else None),
         title=titulo,
         job_description=body.job_description,
         resume_text=body.resume_text,
@@ -84,17 +115,24 @@ def create_interview(
 
 
 # ---------------------------------------------------------------------------
-# GET /interviews  → lista entrevistas (histórico da sidebar)
+# GET /interviews  → lista entrevistas (histórico salvo APENAS para usuários logados)
 # ---------------------------------------------------------------------------
 @router.get("", response_model=list[InterviewSummary])
 def list_interviews(
-    guest_id: Optional[str] = None,
+    user_id: Optional[int] = None,
     db: Session = Depends(get_db),
 ):
-    q = db.query(Interview).order_by(Interview.created_at.desc())
-    if guest_id:
-        q = q.filter(Interview.guest_id == guest_id)
-    return q.limit(50).all()
+    # O histórico de conversas é salvo e disponibilizado apenas para usuários logados
+    if not user_id:
+        return []
+
+    return (
+        db.query(Interview)
+        .filter(Interview.user_id == user_id)
+        .order_by(Interview.created_at.desc())
+        .limit(50)
+        .all()
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -256,4 +294,117 @@ def send_message(
             "X-Accel-Buffering": "no",
         },
     )
+
+
+# ---------------------------------------------------------------------------
+# GET /interviews/reports/all  → Lista todos os relatórios do usuário logado
+# ---------------------------------------------------------------------------
+@router.get("/reports/all", response_model=list[ReportOut])
+def list_user_reports(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    reports = (
+        db.query(Report)
+        .join(Interview, Report.interview_id == Interview.id)
+        .filter(Interview.user_id == current_user.id)
+        .order_by(Report.created_at.desc())
+        .all()
+    )
+    return reports
+
+
+# ---------------------------------------------------------------------------
+# POST /interviews/{id}/report  → Gera relatório de análise (APENAS logado)
+# ---------------------------------------------------------------------------
+@router.post("/{interview_id}/report", response_model=ReportOut)
+def generate_interview_report(
+    interview_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    interview = db.query(Interview).filter(Interview.id == interview_id).first()
+    if not interview:
+        raise HTTPException(status_code=404, detail="Entrevista não encontrada.")
+
+    # Se a entrevista começou anônima, associa ao usuário logado que está gerando o relatório
+    if interview.user_id is None:
+        interview.user_id = current_user.id
+    elif interview.user_id != current_user.id:
+        raise HTTPException(
+            status_code=403,
+            detail="Você não tem permissão para gerar o relatório desta entrevista.",
+        )
+
+    # Se o relatório já foi gerado anteriormente, retorna o existente
+    if interview.report:
+        return interview.report
+
+    # Converte histórico de mensagens para o avaliador
+    messages_payload = [{"role": m.role, "content": m.content} for m in interview.messages]
+
+    # Gera a avaliação via LLM
+    analise = gerar_relatorio_analise(
+        messages=messages_payload,
+        job_description=interview.job_description,
+        resume_text=interview.resume_text,
+    )
+
+    # Cria o relatório no banco
+    report = Report(
+        interview_id=interview.id,
+        score=analise["score"],
+        score_technical=analise["score_technical"],
+        score_communication=analise["score_communication"],
+        score_alignment=analise["score_alignment"],
+        summary=analise["summary"],
+    )
+    db.add(report)
+    db.flush()
+
+    for idx, item in enumerate(analise.get("items", [])):
+        db.add(
+            ReportItem(
+                report_id=report.id,
+                kind=item.get("kind", "improvement"),
+                topic=item.get("topic"),
+                description=item.get("description", ""),
+                sort_order=idx,
+            )
+        )
+
+    interview.status = "finished"
+    db.commit()
+    db.refresh(report)
+
+    return report
+
+
+# ---------------------------------------------------------------------------
+# GET /interviews/{id}/report  → Busca o relatório existente (APENAS logado)
+# ---------------------------------------------------------------------------
+@router.get("/{interview_id}/report", response_model=ReportOut)
+def get_interview_report(
+    interview_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    interview = db.query(Interview).filter(Interview.id == interview_id).first()
+    if not interview:
+        raise HTTPException(status_code=404, detail="Entrevista não encontrada.")
+
+    if interview.user_id != current_user.id:
+        raise HTTPException(
+            status_code=403,
+            detail="Você não tem permissão para visualizar este relatório.",
+        )
+
+    if not interview.report:
+        raise HTTPException(
+            status_code=404,
+            detail="Relatório ainda não foi gerado para esta entrevista.",
+        )
+
+    return interview.report
+
 

@@ -1,3 +1,4 @@
+from typing import Optional
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
@@ -5,5 +6,7 @@ class Settings(BaseSettings):
 
     gemini_api_key: str
     gemini_model: str
+    jwt_secret: str = "smart-interview-super-secret-key-change-in-production"
+    google_client_id: Optional[str] = None
 
 settings = Settings()

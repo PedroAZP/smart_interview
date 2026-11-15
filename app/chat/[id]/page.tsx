@@ -2,15 +2,20 @@
 
 import * as React from "react";
 import { useParams } from "next/navigation";
-import { ArrowUp } from "lucide-react";
-
-// ---------------------------------------------------------------------------
-// O componente real que usa useParams() fica dentro de <Suspense> no export
-// default. Isso permite o prerender em rotas dinâmicas (ex: /chat/[id]).
-// ---------------------------------------------------------------------------
-
-import { cn } from "@/lib/utils";
-import { getMessages, replyInterview, sendMessage, type MessageOut } from "@/lib/api";
+import {
+  generateReport,
+  getMessages,
+  getReport,
+  replyInterview,
+  sendMessage,
+  type MessageOut,
+  type ReportOut,
+} from "@/lib/api";
+import { useAuth } from "@/hooks/use-auth";
+import { cn } from "cn";
+import { ArrowUp, Award, Loader2, Sparkles } from "lucide-react";
+import { AuthRequiredDialog } from "@/components/auth-required-dialog";
+import { ReportDialog } from "@/components/report-dialog";
 
 type Message = {
   id: string;
@@ -46,12 +51,19 @@ function ChatSkeleton() {
 
 function ChatContent() {
   const { id: interviewId } = useParams<{ id: string }>();
+  const { user, token } = useAuth();
 
   const [messages, setMessages] = React.useState<Message[]>([]);
   const [isStreaming, setIsStreaming] = React.useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = React.useState(true);
   const [input, setInput] = React.useState("");
   const [error, setError] = React.useState<string | null>(null);
+
+  // Estados do Relatório de Análise
+  const [report, setReport] = React.useState<ReportOut | null>(null);
+  const [isReportOpen, setIsReportOpen] = React.useState(false);
+  const [isAuthDialogOpen, setIsAuthDialogOpen] = React.useState(false);
+  const [isGeneratingReport, setIsGeneratingReport] = React.useState(false);
 
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
   const bottomRef = React.useRef<HTMLDivElement>(null);
@@ -87,12 +99,23 @@ function ChatContent() {
         setIsLoadingHistory(false);
       });
 
+    // Se estiver logado, checa se já existe um relatório gerado para esta entrevista
+    if (token) {
+      getReport(interviewId, token)
+        .then((existingReport) => {
+          if (!isCancelled) setReport(existingReport);
+        })
+        .catch(() => {
+          // Relatório ainda não foi gerado, normal
+        });
+    }
+
     return () => {
       isCancelled = true;
       abortController.abort();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [interviewId]);
+  }, [interviewId, token]);
 
   // 2. Auto-resize do textarea
   React.useEffect(() => {
@@ -143,8 +166,8 @@ function ChatContent() {
         (chunk) => {
           setMessages((prev) =>
             prev.map((m) =>
-              m.id === replyId ? { ...m, content: m.content + chunk } : m
-            )
+              m.id === replyId ? { ...m, content: m.content + chunk } : m,
+            ),
           );
         },
         () => {
@@ -153,7 +176,7 @@ function ChatContent() {
             window.dispatchEvent(new CustomEvent("interviews-changed"));
           }
         },
-        signal
+        signal,
       );
     } catch (err) {
       if (signal?.aborted) return;
@@ -187,8 +210,8 @@ function ChatContent() {
         (chunk) => {
           setMessages((prev) =>
             prev.map((m) =>
-              m.id === replyId ? { ...m, content: m.content + chunk } : m
-            )
+              m.id === replyId ? { ...m, content: m.content + chunk } : m,
+            ),
           );
         },
         () => {
@@ -196,7 +219,7 @@ function ChatContent() {
           if (typeof window !== "undefined") {
             window.dispatchEvent(new CustomEvent("interviews-changed"));
           }
-        }
+        },
       );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao obter resposta.");
@@ -212,8 +235,87 @@ function ChatContent() {
     }
   }
 
+  async function handleReportClick() {
+    if (!user || !token) {
+      setIsAuthDialogOpen(true);
+      return;
+    }
+
+    if (report) {
+      setIsReportOpen(true);
+      return;
+    }
+
+    setIsGeneratingReport(true);
+    setError(null);
+    try {
+      const generated = await generateReport(interviewId, token);
+      setReport(generated);
+      setIsReportOpen(true);
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("interviews-changed"));
+      }
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Erro ao gerar relatório da entrevista.",
+      );
+    } finally {
+      setIsGeneratingReport(false);
+    }
+  }
+
   return (
     <div className="flex flex-1 flex-col">
+      {/* Barra de ação do topo */}
+      <div className="sticky top-0 z-10 border-b border-border/40 bg-background/80 backdrop-blur-md">
+        <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-2.5">
+          <div className="flex items-center gap-2">
+            <span
+              className={cn(
+                "flex size-2 rounded-full",
+                report ? "bg-emerald-400" : "bg-cyan-400 animate-pulse",
+              )}
+            />
+            <span className="text-xs font-medium text-muted-foreground">
+              {report ? "Entrevista Concluída" : "Entrevista com Tech Lead"}
+            </span>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleReportClick}
+            disabled={isGeneratingReport || isStreaming}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium shadow-xs transition",
+              report
+                ? "border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20"
+                : "border border-cyan-500/30 bg-cyan-500/10 text-cyan-400 hover:bg-cyan-500/20",
+              (isGeneratingReport || isStreaming) &&
+                "cursor-not-allowed opacity-60",
+            )}
+          >
+            {isGeneratingReport ? (
+              <>
+                <Loader2 className="size-3.5 animate-spin" />
+                <span>Avaliando respostas...</span>
+              </>
+            ) : report ? (
+              <>
+                <Award className="size-3.5" />
+                <span>Ver diagnóstico ({report.score}/100)</span>
+              </>
+            ) : (
+              <>
+                <Sparkles className="size-3.5" />
+                <span>Encerrar e gerar relatório</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+
       {/* Lista de mensagens */}
       <div className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-6 py-6">
         {isLoadingHistory && (
@@ -234,7 +336,7 @@ function ChatContent() {
               key={m.id}
               className={cn(
                 "flex w-full gap-3",
-                isUser ? "justify-end" : "justify-start"
+                isUser ? "justify-end" : "justify-start",
               )}
             >
               <div
@@ -242,7 +344,7 @@ function ChatContent() {
                   "max-w-[85%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed break-words whitespace-pre-wrap sm:max-w-[75%]",
                   isUser
                     ? "rounded-br-md bg-muted text-foreground"
-                    : "rounded-tl-md border border-border/60 bg-card/60"
+                    : "rounded-tl-md border border-border/60 bg-card/60",
                 )}
               >
                 {isTyping ? (
@@ -296,7 +398,7 @@ function ChatContent() {
                 "flex size-9 shrink-0 items-center justify-center rounded-full outline-none transition focus-visible:ring-2 focus-visible:ring-cyan-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                 canSend
                   ? "bg-cyan-400 text-slate-900 hover:bg-cyan-300"
-                  : "cursor-not-allowed bg-muted text-muted-foreground"
+                  : "cursor-not-allowed bg-muted text-muted-foreground",
               )}
             >
               <ArrowUp className="size-5" />
@@ -304,6 +406,20 @@ function ChatContent() {
           </div>
         </div>
       </div>
+
+      {/* Diálogos de Relatório e Bloqueio de Auth */}
+      <AuthRequiredDialog
+        isOpen={isAuthDialogOpen}
+        onClose={() => setIsAuthDialogOpen(false)}
+        title="Inicie sessão para gerar o relatório"
+        description="A avaliação técnica, notas por competência e o plano de melhoria são exclusivos para usuários logados. Crie sua conta gratuita em segundos para salvar seu progresso."
+      />
+
+      <ReportDialog
+        report={report}
+        isOpen={isReportOpen}
+        onClose={() => setIsReportOpen(false)}
+      />
     </div>
   );
 }

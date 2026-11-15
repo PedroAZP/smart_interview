@@ -24,17 +24,12 @@ import { NavHistory, NavProjects } from "./nav-items";
 import { NavUser } from "./nav-user";
 import { listInterviews, type InterviewSummary } from "@/lib/api";
 import { useGuestId } from "@/hooks/use-guest-id";
+import { useAuth } from "@/hooks/use-auth";
 
 const STATIC_PROJECTS = [
   { name: "Nova conversa", url: "/", icon: MessagesCircle },
   { name: "Diagnóstico", url: "/analise", icon: Newspaper },
 ];
-
-const STATIC_USER = {
-  name: "Pedro",
-  email: "pedro@exemplo.com",
-  avatar: "/avatars/shadcn.jpg",
-};
 
 function SidebarLogo() {
   const { toggleSidebar } = useSidebar();
@@ -54,18 +49,20 @@ function SidebarLogo() {
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const guestId = useGuestId();
+  const { user } = useAuth();
   const [history, setHistory] = React.useState<InterviewSummary[]>([]);
 
   const fetchHistory = React.useCallback(() => {
-    if (!guestId) return;
-    listInterviews(guestId)
-      .then(setHistory)
-      .catch(() => {
-        // Silencia o erro — o backend pode estar offline durante dev
-      });
-  }, [guestId]);
+    if (user?.id) {
+      listInterviews(undefined, user.id)
+        .then(setHistory)
+        .catch(() => {});
+    } else {
+      setHistory([]);
+    }
+  }, [user?.id]);
 
-  // Busca o histórico quando o guestId estiver disponível e ouve atualizações
+  // Busca o histórico inicial e ouve atualizações de chat e auth
   React.useEffect(() => {
     fetchHistory();
 
@@ -74,8 +71,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     };
 
     window.addEventListener("interviews-changed", handleUpdate);
+    window.addEventListener("auth-changed", handleUpdate);
     return () => {
       window.removeEventListener("interviews-changed", handleUpdate);
+      window.removeEventListener("auth-changed", handleUpdate);
     };
   }, [fetchHistory]);
 
@@ -116,11 +115,11 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
 
       <SidebarContent>
         <NavProjects projects={STATIC_PROJECTS} />
-        <NavHistory items={historyItems} />
+        <NavHistory items={historyItems} isAuthenticated={!!user} />
       </SidebarContent>
 
       <SidebarFooter>
-        <NavUser user={STATIC_USER} />
+        <NavUser user={user} />
       </SidebarFooter>
 
       <SidebarRail />

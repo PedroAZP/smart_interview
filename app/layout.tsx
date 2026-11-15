@@ -2,13 +2,8 @@ import type { Metadata } from "next";
 import { Montserrat } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
-import {
-  SidebarInset,
-  SidebarProvider,
-  SidebarTrigger,
-} from "@/components/ui/sidebar";
-import { Separator } from "@/components/ui/separator";
-import { AppSidebar } from "@/components/sidebar/app-sidebar";
+import { AuthProvider } from "@/hooks/use-auth";
+import { AppLayoutShell } from "@/components/app-layout-shell";
 
 const montserrat = Montserrat({ subsets: ["latin"] });
 
@@ -29,12 +24,9 @@ export default function RootLayout({
       className={cn("h-full antialiased", montserrat.className)}
     >
       <body className="min-h-svh">
-        <SidebarProvider>
-          <AppSidebar />
-          <SidebarInset>
-            <div className="flex flex-1 flex-col p-4">{children}</div>
-          </SidebarInset>
-        </SidebarProvider>
+        <AuthProvider>
+          <AppLayoutShell>{children}</AppLayoutShell>
+        </AuthProvider>
       </body>
     </html>
   );

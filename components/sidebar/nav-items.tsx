@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import type { LucideIcon } from "lucide-react";
+import { Lock, LogIn, type LucideIcon } from "lucide-react";
 
 import {
   SidebarGroup,
@@ -47,17 +47,38 @@ function NavProjectsInner({
 
 function NavHistoryInner({
   items,
+  isAuthenticated,
 }: {
   items: { id: string; title: string; url: string }[];
+  isAuthenticated?: boolean;
 }) {
   const pathname = usePathname();
 
   return (
     <SidebarGroup className="group-data-[collapsible=icon]:hidden">
       <SidebarGroupLabel>Histórico de conversas</SidebarGroupLabel>
-      {items.length === 0 ? (
+      {!isAuthenticated ? (
+        <div className="mx-2 my-1 rounded-xl border border-dashed border-border/80 bg-muted/30 p-3 text-center">
+          <div className="mx-auto mb-2 flex size-8 items-center justify-center rounded-lg bg-sky-500/10 text-sky-400">
+            <Lock className="size-4" />
+          </div>
+          <p className="text-xs font-semibold text-foreground">
+            Histórico exclusivo
+          </p>
+          <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">
+            Inicie sua sessão para salvar automaticamente suas conversas e acessar diagnósticos.
+          </p>
+          <Link
+            href="/login"
+            className="mt-3 inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-primary px-2.5 py-1.5 text-xs font-medium text-primary-foreground shadow-xs transition hover:bg-primary/90"
+          >
+            <LogIn className="size-3.5" />
+            Entrar ou cadastrar
+          </Link>
+        </div>
+      ) : items.length === 0 ? (
         <p className="px-2 py-1 text-xs text-sidebar-foreground/50">
-          Nenhuma conversa ainda
+          Nenhuma conversa salva ainda
         </p>
       ) : (
         <SidebarMenu>
@@ -96,12 +117,14 @@ export function NavProjects({
 
 export function NavHistory({
   items,
+  isAuthenticated,
 }: {
   items: { id: string; title: string; url: string }[];
+  isAuthenticated?: boolean;
 }) {
   return (
     <React.Suspense fallback={<NavHistoryFallback />}>
-      <NavHistoryInner items={items} />
+      <NavHistoryInner items={items} isAuthenticated={isAuthenticated} />
     </React.Suspense>
   );
 }
