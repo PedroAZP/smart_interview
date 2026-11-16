@@ -4,7 +4,7 @@ import secrets
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
-from pydantic import BaseModel, EmailStr, Field
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app.db import get_db
@@ -38,9 +38,7 @@ class LoginRequest(BaseModel):
 
 
 class GoogleAuthRequest(BaseModel):
-    credential: Optional[str] = None
-    email: Optional[str] = None
-    name: Optional[str] = None
+    credential: str = Field(..., min_length=10)
 
 
 class UserOut(BaseModel):
@@ -153,27 +151,23 @@ def login(body: LoginRequest, db: Session = Depends(get_db)):
 # ---------------------------------------------------------------------------
 @router.post("/google", response_model=AuthResponse)
 def google_auth(body: GoogleAuthRequest, db: Session = Depends(get_db)):
-    email = None
-    name = None
-
-    if body.credential:
-        info = verify_google_credential(body.credential)
-        if info:
-            email = info.get("email")
-            name = info.get("name") or info.get("given_name") or email.split("@")[0]
-
-    if not email and body.email:
-        email = body.email
-        name = body.name or email.split("@")[0]
-
-    if not email:
+    info = verify_google_credential(body.credential)
+    if not info or not info.get("email"):
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Não foi possível identificar o usuário pelo Google.",
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Credencial do Google inválida ou expirada.",
         )
 
-    email_clean = email.strip().lower()
-    name_clean = (name or "Usuário Google").strip()
+    # Garante que o e-mail da conta Google seja verificado
+    if not info.get("email_verified", False):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="O e-mail desta conta Google não está verificado.",
+        )
+
+    email_clean = info["email"].strip().lower()
+    raw_name = info.get("name") or info.get("given_name") or email_clean.split("@")[0]
+    name_clean = raw_name.strip()
 
     # Busca usuário existente ou cria novo
     user = db.query(User).filter(User.email == email_clean).first()

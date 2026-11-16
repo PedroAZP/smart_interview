@@ -2,7 +2,14 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { ArrowUp, FileText, Loader2, Plus, SquareTerminal, X } from "lucide-react";
+import {
+  ArrowUp,
+  FileText,
+  Loader2,
+  Plus,
+  SquareTerminal,
+  X,
+} from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { createInterview } from "@/lib/api";
@@ -16,7 +23,7 @@ export default function HomePage() {
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  const displayName = user ? user.name.split(" ")[0] : "Pedro";
+  const displayName = user ? user.name.split(" ")[0] : "";
 
   const [value, setValue] = React.useState("");
   const [files, setFiles] = React.useState<File[]>([]);
@@ -54,7 +61,7 @@ export default function HomePage() {
         guestId: guestId ?? undefined,
         userId: user?.id,
       });
-      
+
       // Notifica a sidebar para carregar o histórico com a nova conversa imediatamente
       if (typeof window !== "undefined") {
         window.dispatchEvent(new CustomEvent("interviews-changed"));
@@ -67,7 +74,9 @@ export default function HomePage() {
 
       router.push(`/chat/${id}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro ao iniciar a entrevista.");
+      setError(
+        err instanceof Error ? err.message : "Erro ao iniciar a entrevista.",
+      );
       setIsLoading(false);
     }
   }
@@ -99,7 +108,7 @@ export default function HomePage() {
           <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-slate-700 bg-slate-800 text-sky-100 shadow-sm">
             <SquareTerminal className="size-5" />
           </div>
-          <h1 className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
+          <h1 className="text-balance text-2xl font-semibold tracking-tight sm:text-3xl">
             {user
               ? `Pronto para a entrevista, ${user.name.split(" ")[0]}?`
               : "Pronto para a sua próxima entrevista?"}
@@ -178,7 +187,7 @@ export default function HomePage() {
                 "flex size-9 items-center justify-center rounded-full outline-none transition focus-visible:ring-2 focus-visible:ring-cyan-400/60 focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                 canSend
                   ? "bg-cyan-400 text-slate-900 hover:bg-cyan-300 cursor-pointer"
-                  : "cursor-not-allowed bg-muted text-muted-foreground"
+                  : "cursor-not-allowed bg-muted text-muted-foreground",
               )}
             >
               {isLoading ? (

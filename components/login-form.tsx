@@ -55,7 +55,11 @@ export function LoginForm({
               setIsGoogleLoading(true);
               loginGoogle({ credential: response.credential })
                 .catch((err) => {
-                  setError(err instanceof Error ? err.message : "Falha ao autenticar com o Google.");
+                  setError(
+                    err instanceof Error
+                      ? err.message
+                      : "Falha ao autenticar com o Google.",
+                  );
                 })
                 .finally(() => setIsGoogleLoading(false));
             },
@@ -72,7 +76,7 @@ export function LoginForm({
 
     if (!googleClientId) {
       setError(
-        "Chave do Google não configurada. Defina NEXT_PUBLIC_GOOGLE_CLIENT_ID no arquivo .env.local para habilitar o login oficial do Google."
+        "Chave do Google não configurada. Defina NEXT_PUBLIC_GOOGLE_CLIENT_ID no arquivo .env.local para habilitar o login oficial do Google.",
       );
       return;
     }
@@ -80,7 +84,9 @@ export function LoginForm({
     if (window.google?.accounts?.id) {
       window.google.accounts.id.prompt();
     } else {
-      setError("O serviço do Google ainda está carregando. Tente novamente em instantes.");
+      setError(
+        "O serviço do Google ainda está carregando. Tente novamente em instantes.",
+      );
     }
   }
 
@@ -97,7 +103,9 @@ export function LoginForm({
     try {
       await login(email.trim(), password);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Email ou senha incorretos.");
+      setError(
+        err instanceof Error ? err.message : "Email ou senha incorretos.",
+      );
     } finally {
       setIsLoading(false);
     }
@@ -108,9 +116,7 @@ export function LoginForm({
       <Card>
         <CardHeader className="text-center">
           <CardTitle className="text-xl">Bem-vindo de volta</CardTitle>
-          <CardDescription>
-            Entre com sua conta Google ou use seu email
-          </CardDescription>
+          <CardDescription>Entre com sua conta Google</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit}>
@@ -175,7 +181,9 @@ export function LoginForm({
                     href="#"
                     onClick={(e) => {
                       e.preventDefault();
-                      alert("Para redefinir sua senha, entre em contato com o suporte ou crie uma nova conta.");
+                      alert(
+                        "Para redefinir sua senha, entre em contato com o suporte ou crie uma nova conta.",
+                      );
                     }}
                     className="ml-auto text-xs text-muted-foreground underline-offset-4 hover:underline"
                   >
@@ -195,7 +203,11 @@ export function LoginForm({
               </Field>
 
               <Field>
-                <Button type="submit" disabled={isLoading} className="w-full cursor-pointer">
+                <Button
+                  type="submit"
+                  disabled={isLoading}
+                  className="w-full cursor-pointer"
+                >
                   {isLoading ? (
                     <span className="flex items-center gap-2">
                       <Loader2 className="size-4 animate-spin" />
@@ -207,7 +219,10 @@ export function LoginForm({
                 </Button>
                 <FieldDescription className="text-center text-xs mt-2">
                   Não tem uma conta?{" "}
-                  <Link href="/cadastro" className="font-medium text-cyan-400 underline underline-offset-4 hover:text-cyan-300">
+                  <Link
+                    href="/cadastro"
+                    className="font-medium text-cyan-400 underline underline-offset-4 hover:text-cyan-300"
+                  >
                     Cadastre-se
                   </Link>
                 </FieldDescription>
@@ -219,11 +234,17 @@ export function LoginForm({
 
       <FieldDescription className="px-6 text-center text-xs text-muted-foreground">
         Ao continuar, você concorda com nossos{" "}
-        <a href="#" className="underline underline-offset-4 hover:text-foreground">
+        <a
+          href="#"
+          className="underline underline-offset-4 hover:text-foreground"
+        >
           Termos de Serviço
         </a>{" "}
         e{" "}
-        <a href="#" className="underline underline-offset-4 hover:text-foreground">
+        <a
+          href="#"
+          className="underline underline-offset-4 hover:text-foreground"
+        >
           Política de Privacidade
         </a>
         .

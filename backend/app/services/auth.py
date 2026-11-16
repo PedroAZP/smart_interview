@@ -13,6 +13,7 @@ from google.oauth2 import id_token as google_id_token
 
 from app.config import settings
 
+
 # ---------------------------------------------------------------------------
 # Hashing de Senha (PBKDF2 HMAC-SHA256)
 # ---------------------------------------------------------------------------
@@ -101,25 +102,18 @@ def decode_access_token(token: str) -> Optional[dict]:
 # Verificação de Token Google
 # ---------------------------------------------------------------------------
 def verify_google_credential(credential: str) -> Optional[dict]:
-    """Valida o id_token do Google. Se client_id estiver configurado, valida a assinatura.
-    Caso contrário, decodifica o payload de forma segura."""
-    try:
-        if settings.google_client_id:
-            idinfo = google_id_token.verify_oauth2_token(
-                credential, google_requests.Request(), settings.google_client_id
-            )
-            return idinfo
+    """Valida criptograficamente o id_token do Google usando o GOOGLE_CLIENT_ID."""
+    if not settings.google_client_id:
+        print("ERRO DE CONFIGURAÇÃO: GOOGLE_CLIENT_ID não definido no arquivo .env.")
+        return None
 
-        # Modo de desenvolvimento: decodifica o payload do JWT do Google sem verificação de assinatura
-        parts = credential.split(".")
-        if len(parts) >= 2:
-            payload_bytes = _b64url_decode(parts[1])
-            data = json.loads(payload_bytes.decode("utf-8"))
-            if data.get("email"):
-                return data
+    try:
+        idinfo = google_id_token.verify_oauth2_token(
+            credential,
+            google_requests.Request(),
+            settings.google_client_id,
+        )
+        return idinfo
     except Exception as e:
         print(f"Erro ao verificar token do Google: {e}")
         return None
-
-    return None
-
