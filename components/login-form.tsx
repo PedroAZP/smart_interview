@@ -34,41 +34,78 @@ export function LoginForm({
   const [isLoading, setIsLoading] = React.useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
+  const googleBtnRef = React.useRef<HTMLDivElement>(null);
 
   // Inicializa o Google Identity Services se o Client ID estiver presente
+  const loginGoogleRef = React.useRef(loginGoogle);
   React.useEffect(() => {
-    const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
-    if (!googleClientId) return;
+    loginGoogleRef.current = loginGoogle;
+  }, [loginGoogle]);
 
-    // Carrega o script oficial do Google se ainda não estiver carregado
-    if (!document.getElementById("google-gsi-script")) {
-      const script = document.createElement("script");
+  React.useEffect(() => {
+    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    if (!clientId) {
+      setError("NEXT_PUBLIC_GOOGLE_CLIENT_ID não configurado no .env.local.");
+      return;
+    }
+
+    function init() {
+      const gsi = window.google?.accounts?.id;
+      const container = googleBtnRef.current;
+      if (!gsi || !container) return;
+
+      gsi.initialize({
+        client_id: clientId,
+        callback: async (response) => {
+          setError(null);
+          setIsGoogleLoading(true);
+          try {
+            await loginGoogleRef.current({ credential: response.credential });
+          } catch (err) {
+            setError(
+              err instanceof Error
+                ? err.message
+                : "Falha ao autenticar com o Google.",
+            );
+          } finally {
+            setIsGoogleLoading(false);
+          }
+        },
+      });
+
+      gsi.renderButton(container, {
+        type: "standard",
+        theme: "outline",
+        size: "large",
+        text: "signin_with",
+        shape: "rectangular",
+        locale: "pt-BR",
+        width: Math.min(400, container.offsetWidth || 320),
+      });
+    }
+
+    // Script já carregado: inicializa direto
+    if (window.google?.accounts?.id) {
+      init();
+      return;
+    }
+
+    let script = document.getElementById(
+      "google-gsi-script",
+    ) as HTMLScriptElement | null;
+
+    if (!script) {
+      script = document.createElement("script");
       script.id = "google-gsi-script";
       script.src = "https://accounts.google.com/gsi/client";
       script.async = true;
       script.defer = true;
-      script.onload = () => {
-        if (window.google?.accounts?.id) {
-          window.google.accounts.id.initialize({
-            client_id: googleClientId,
-            callback: (response: { credential: string }) => {
-              setIsGoogleLoading(true);
-              loginGoogle({ credential: response.credential })
-                .catch((err) => {
-                  setError(
-                    err instanceof Error
-                      ? err.message
-                      : "Falha ao autenticar com o Google.",
-                  );
-                })
-                .finally(() => setIsGoogleLoading(false));
-            },
-          });
-        }
-      };
       document.body.appendChild(script);
     }
-  }, [loginGoogle]);
+
+    script.addEventListener("load", init);
+    return () => script?.removeEventListener("load", init);
+  }, []);
 
   async function handleGoogleClick() {
     setError(null);
@@ -122,29 +159,38 @@ export function LoginForm({
           <form onSubmit={handleSubmit}>
             <FieldGroup>
               <Field>
-                <Button
-                  variant="outline"
-                  type="button"
-                  onClick={handleGoogleClick}
-                  disabled={isGoogleLoading || isLoading}
-                  className="w-full flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  {isGoogleLoading ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <svg
-                      className="size-4"
-                      xmlns="http://www.w3.org/2000/svg"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z"
-                        fill="currentColor"
-                      />
-                    </svg>
-                  )}
-                  Entrar com o Google
-                </Button>
+                <div className="relative h-10 w-full">
+                  {/* Visual customizado (não recebe clique) */}
+                  <Button
+                    variant="outline"
+                    type="button"
+                    tabIndex={-1}
+                    disabled={isGoogleLoading || isLoading}
+                    className="pointer-events-none flex h-10 w-full items-center justify-center gap-2"
+                  >
+                    {isGoogleLoading ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <svg
+                        className="size-4"
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          d="M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z"
+                          fill="currentColor"
+                        />
+                      </svg>
+                    )}
+                    Entrar com o Google
+                  </Button>
+
+                  {/* Botão oficial do Google, invisível por cima */}
+                  <div
+                    ref={googleBtnRef}
+                    className="absolute inset-0 overflow-hidden opacity-[0.01]"
+                  />
+                </div>
               </Field>
 
               <FieldSeparator className="*:data-[slot=field-separator-content]:bg-card">
@@ -259,9 +305,15 @@ declare global {
     google?: {
       accounts?: {
         id?: {
-          initialize: (config: unknown) => void;
+          initialize: (config: {
+            client_id?: string;
+            callback: (response: { credential: string }) => void;
+          }) => void;
           prompt: () => void;
-          renderButton: (parent: HTMLElement, options: unknown) => void;
+          renderButton: (
+            parent: HTMLElement,
+            options: Record<string, unknown>,
+          ) => void;
         };
       };
     };
